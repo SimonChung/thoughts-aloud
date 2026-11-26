@@ -44,6 +44,40 @@ flutter test
 flutter run
 ```
 
+### iPhone 模擬器專用：台灣華語即時逐字稿
+
+以下是 iPhone 17 模擬器（iOS 27.2，24B8117）的開發測試做法。實體 iPhone、iPad 請依上方的首次使用說明授權，由 iOS 管理語音模型。
+
+這次模擬器已下載台灣華語模型，但辨識器讀取的 `AssetData` 目錄只有 `Restore`，找不到 `mini.json`，錄音時回報 `kLSRErrorDomain 300`。展開原始映像後，辨識器雖然讀得到設定，卻只能找到為 iPhone 晶片編譯的 `H18.bundle`，語音服務隨即中止。測試時改用 Apple 較早發布的完整 `zh-TW` 離線模型（EmbeddedSpeech，build `9M5258`）。
+
+1. 建立專用測試模擬器，將 App 語言設為繁體中文。若是全新模擬器，可在該模擬器內的 Swift 測試工具呼叫 `try await prepareTaiwanMandarin()`，等系統下載台灣華語資產。
+
+   ```swift
+   import Speech
+
+   func prepareTaiwanMandarin() async throws {
+       let transcriber = DictationTranscriber(
+           locale: Locale(identifier: "zh_TW"), preset: .progressiveLongDictation)
+       if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+           try await request.downloadAndInstall()
+       }
+   }
+   ```
+
+2. 用 `xcrun simctl list devices` 確認該模擬器的 UDID。於 `~/Library/Developer/CoreSimulator/Devices/<UDID>/data/private/var/MobileAsset/AssetsV2/com_apple_MobileAsset_UAF_Siri_Understanding/purpose_auto/` 下，找出 `Info.plist` 的 `CFBundleName` 為 `com.apple.siri.asr.assistant.zh_TW` 的 `.asset` 目錄。
+3. 下載 Apple 目錄中 `Language=zh-TW`、`Build=9M5258` 的 ZIP。以 `shasum -a 256` 核對下載檔，這次實測的 SHA-256 為 `c429fe0959953cccc85f082207e8cc83fce22b97200b4c2b39984ced651dd4c0`。[Apple 模型目錄](https://mesu.apple.com/assets/com_apple_MobileAsset_EmbeddedSpeech/com_apple_MobileAsset_EmbeddedSpeech.xml) · [Apple 模型下載](https://updates.cdn-apple.com/2021/mobileassets/001-83640/F6750AFC-60FA-4929-92ED-90BE91BD3EE1/com_apple_MobileAsset_EmbeddedSpeech/c76ec47d61a36d7ac2e383a4d321d425f8396132.zip)
+4. 用 `xcrun simctl shutdown <UDID>` 關閉該模擬器。在步驟 2 找到的 `.asset/AssetData/` 內保留原始 `Restore/`，將其餘既有模型檔移到模擬器外備份。解壓 ZIP，將 `AssetData/cmn-TWN-OfflineIOS-7.0.0.0-20201207-9d9965f45/` **裡面的全部內容**複製進目標 `AssetData/`。完成後，`mini.json`、`AM-RFDNN/` 和 `Restore/` 應位於同一層。
+5. 用 `xcrun simctl boot <UDID>` 重新啟動，開啟「想唸」並允許麥克風與語音辨識。開始錄音，在按「完成錄音」前確認「即時逐字稿」隨語音更新，再儲存卡片核對文字。重置模擬器或系統更新模型後，可能需要重新套用。
+
+**重測結果**（2026-11-27，App 提交 `88876b8`）
+
+測試將兩段台灣華語合成音訊輸入模擬器的錄音回呼，由 App 的 `SFSpeechRecognizer` 即時辨識。「首次顯示文字」取自錄音尚在進行時的畫面，時間為當時的累積錄音長度。音訊循環播放，因此卡片末尾含有重複片段。
+
+| 測試語音 | 首次顯示文字 | 儲存後核對 |
+| --- | --- | --- |
+| 今天是星期五，我想喝一杯咖啡。請幫我記錄這段語音。 | 1.5 秒，顯示「今天是」 | 卡片保留逐字稿，「記錄」誤辨為「進入」。 |
+| 明天下午三點，我要搭火車去台北，記得帶藍色的雨傘。 | 2.0 秒，顯示「明天」 | 卡片保留完整句子。 |
+
 ## 套件清單
 
 [Pub 套件 SBOM](sbom/pub.cdx.json) 與 [Android Gradle 元件 SBOM](sbom/android.cdx.json) 採用 CycloneDX 格式，Pub 元件依鎖檔產生，直接、開發與間接相依關係依 `dart pub deps --json` 核對。Android 清單涵蓋應用與測試組態的 Gradle 解析結果。
