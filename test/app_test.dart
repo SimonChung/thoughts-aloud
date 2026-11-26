@@ -1,12 +1,20 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:thoughts_aloud/l10n/l10n.dart';
 import 'package:thoughts_aloud/main.dart';
 
 Future<void> launch(
   WidgetTester tester, {
   Size size = const Size(393, 852),
   double scale = 1,
+  Locale locale = const Locale.fromSubtags(
+    languageCode: 'zh',
+    scriptCode: 'Hant',
+    countryCode: 'TW',
+  ),
 }) async {
+  tester.platformDispatcher.localesTestValue = [locale];
+  addTearDown(tester.platformDispatcher.clearLocalesTestValue);
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
   tester.platformDispatcher.textScaleFactorTestValue = scale;
@@ -18,6 +26,7 @@ Future<void> launch(
 
 Future<void> tap(WidgetTester tester, Finder target) async {
   await tester.ensureVisible(target);
+  await tester.pumpAndSettle();
   await tester.tap(target);
   await tester.pumpAndSettle();
 }
@@ -151,6 +160,98 @@ void main() {
     );
     await tap(tester, find.byTooltip('返回'));
     expect(find.text('5 張卡片'), findsOneWidget);
+  });
+
+  testWidgets('英文回退、複數與語言偏好會套用到範例卡片及收藏', (tester) async {
+    await launch(
+      tester,
+      locale: const Locale('fr', 'FR'),
+      size: const Size(1006, 601),
+    );
+    expect(find.text('My cards'), findsOneWidget);
+    final strings = tester.element(find.text('My cards')).l10n;
+    expect(
+      [strings.cardCount(0), strings.cardCount(1), strings.cardCount(4)],
+      ['0 cards', '1 card', '4 cards'],
+    );
+    await tap(tester, find.byTooltip('Search cards'));
+    await tester.enterText(find.byType(TextField), 'Everyday life');
+    await tester.pumpAndSettle();
+    expect(find.text('Put a walk on the calendar'), findsOneWidget);
+    expect(find.text('Good ideas need a little space'), findsNothing);
+    await tap(tester, find.byTooltip('Close search'));
+    await tap(tester, find.text('Put a walk on the calendar'));
+    await tap(tester, find.byTooltip('Add bookmark'));
+    expect(find.text('A small morning ritual'), findsOneWidget);
+    tester.platformDispatcher.localesTestValue = [
+      const Locale('fr'),
+      const Locale('zh', 'TW'),
+    ];
+    await tester.pumpAndSettle();
+    expect(find.text('把散步留在行事曆裡'), findsOneWidget);
+    expect(find.text('早晨的小小儀式'), findsOneWidget);
+    expect(find.byTooltip('取消收藏'), findsOneWidget);
+    await tap(tester, find.byTooltip('返回'));
+    await tap(tester, find.widgetWithText(ChoiceChip, '收藏'));
+    expect(find.text('把散步留在行事曆裡'), findsOneWidget);
+    expect(find.text('早晨的小小儀式'), findsNothing);
+  });
+
+  testWidgets('切換語言會更新錄音範例與驗證提示，保留使用者輸入', (tester) async {
+    await launch(tester, locale: const Locale('en', 'GB'));
+    await tap(tester, find.text('Start recording'));
+    await tester.pump(const Duration(seconds: 7));
+    expect(find.textContaining('practicing the piano'), findsOneWidget);
+    await tap(tester, find.text('Pause'));
+    await tap(tester, find.text('Finish recording'));
+    final fields = find.byType(TextFormField);
+    expect(
+      tester.widget<TextFormField>(fields.first).controller!.text,
+      'Piano around the corner',
+    );
+    await tester.enterText(fields.first, '');
+    await tap(tester, find.text('Save card'));
+    expect(find.text('Enter a card title.'), findsOneWidget);
+    tester.platformDispatcher.localesTestValue = [const Locale('zh', 'HK')];
+    await tester.pumpAndSettle();
+    expect(find.text('請填寫卡片標題。'), findsOneWidget);
+    expect(
+      tester.widget<TextFormField>(fields.first).controller!.text,
+      isEmpty,
+    );
+    expect(
+      tester.widget<TextFormField>(fields.last).controller!.text,
+      contains('聽見有人在練琴'),
+    );
+    await tester.enterText(fields.first, 'My 日記');
+    await tester.enterText(fields.last, '第一段：Hello.');
+    tester.platformDispatcher.localesTestValue = [const Locale('en')];
+    await tester.pumpAndSettle();
+    await tap(tester, find.text('Save card'));
+    expect(find.text('My 日記'), findsOneWidget);
+    expect(find.text('第一段：Hello.'), findsOneWidget);
+    expect(find.text('Everyday life'), findsOneWidget);
+    tester.platformDispatcher.localesTestValue = [const Locale('zh', 'TW')];
+    await tester.pumpAndSettle();
+    expect(find.text('My 日記'), findsOneWidget);
+    expect(find.text('第一段：Hello.'), findsOneWidget);
+    expect(find.text('生活'), findsOneWidget);
+  });
+
+  testWidgets('英文窄螢幕放大字級仍可操作錄音及返回對話框', (tester) async {
+    await launch(
+      tester,
+      locale: const Locale('en'),
+      size: const Size(320, 568),
+      scale: 2,
+    );
+    await tap(tester, find.text('Start recording'));
+    await tap(tester, find.text('Pause'));
+    expect(find.text('Resume'), findsOneWidget);
+    await tap(tester, find.byTooltip('Back'));
+    expect(find.text('Leave this recording?'), findsOneWidget);
+    await tap(tester, find.text('Discard recording'));
+    expect(find.text('4 cards'), findsOneWidget);
   });
 
   testWidgets('窄螢幕與兩倍字級可操作，系統返回會詢問是否捨棄', (tester) async {

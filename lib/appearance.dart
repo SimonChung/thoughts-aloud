@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 
 import 'cards.dart';
+import 'l10n/l10n.dart';
 
 const paper = Color(0xfff9f8f2);
 const ink = Color(0xff20392f);
@@ -167,7 +168,7 @@ class PageBar extends StatelessWidget {
       children: [
         IconButton(
           onPressed: onBack,
-          tooltip: '返回',
+          tooltip: context.l10n.back,
           icon: const Icon(Icons.arrow_back),
         ),
         Expanded(
@@ -219,7 +220,7 @@ class CardTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  card.title,
+                  card.text(context.l10n).title,
                   style: TextStyle(
                     fontSize: compact ? 15 : 16,
                     fontWeight: FontWeight.w600,
@@ -232,15 +233,19 @@ class CardTile extends StatelessWidget {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
-                      '${MaterialLocalizations.of(context).formatShortMonthDay(card.createdAt)}  ·  ${timecode(card.seconds)}',
+                      context.l10n.cardSummary(
+                        MaterialLocalizations.of(context)
+                            .formatShortMonthDay(card.createdAt),
+                        timecode(card.seconds),
+                      ),
                       style: smallText,
                     ),
                     if (saved)
-                      const Icon(
+                      Icon(
                         Icons.bookmark,
                         size: 14,
                         color: muted,
-                        semanticLabel: '已收藏',
+                        semanticLabel: context.l10n.bookmarked,
                       ),
                   ],
                 ),

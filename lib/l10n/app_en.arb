@@ -1,0 +1,125 @@
+{
+  "@@locale": "en",
+  "appName": "Thoughts Aloud",
+  "brandSignature": "",
+  "@brandSignature": {
+    "description": "Secondary wordmark below the app name. Leave empty if it would repeat the name."
+  },
+  "bannerTitle": "Think out\nloud.",
+  "startRecording": "Start recording",
+  "libraryTitle": "My cards",
+  "cardCount": "{count, plural, one{1 card} other{{count} cards}}",
+  "@cardCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "allCards": "All",
+  "savedCards": "Saved",
+  "searchCards": "Search cards",
+  "closeSearch": "Close search",
+  "searchHint": "Search titles or transcripts",
+  "noBookmarks": "No saved cards yet. Open a card and tap the bookmark to save it here.",
+  "noMatches": "No matching cards. Try another search.",
+  "back": "Back",
+  "bookmarked": "Bookmarked",
+  "voiceCard": "Voice card",
+  "addBookmark": "Add bookmark",
+  "removeBookmark": "Remove bookmark",
+  "cardMetadata": "{date} · {time}",
+  "@cardMetadata": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "cardSummary": "{date} · {duration}",
+  "@cardSummary": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "playDemo": "Play preview",
+  "pauseDemo": "Pause preview",
+  "playbackPreview": "Playback preview",
+  "playbackTime": "{elapsed} / {total}",
+  "@playbackTime": {
+    "placeholders": {
+      "elapsed": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "transcript": "Transcript",
+  "relatedCards": "Related cards",
+  "noRelatedCards": "No other cards on this topic yet.",
+  "studioTitle": "Recording studio",
+  "pause": "Pause",
+  "resume": "Resume",
+  "finishRecording": "Finish recording",
+  "recording": "Recording",
+  "paused": "Paused",
+  "demoMode": "Demo mode",
+  "secondsAgo": "−{seconds} s",
+  "@secondsAgo": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "now": "Now",
+  "liveTranscript": "Live transcript",
+  "demoNote": "This demo uses a sample transcript.",
+  "leaveTitle": "Leave this recording?",
+  "leaveMessage": "This demo recording hasn’t been saved as a card yet.",
+  "discardRecording": "Discard recording",
+  "keepRecording": "Keep recording",
+  "editCard": "Edit voice card",
+  "demoDuration": "Demo recording · {duration} · This session only",
+  "@demoDuration": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "cardTitle": "Card title",
+  "missingTitle": "Enter a card title.",
+  "missingTranscript": "Enter a transcript.",
+  "saveCard": "Save card",
+  "demoTitle": "Piano around the corner",
+  "demoTranscript": "{stage, select, opening{As I turned the corner,} piano{As I turned the corner, I heard someone practicing the piano.} sounds{As I turned the corner, I heard someone practicing the piano. Some everyday sounds} other{As I turned the corner, I heard someone practicing the piano. Some everyday sounds are worth stopping for.}}",
+  "@demoTranscript": {
+    "placeholders": {
+      "stage": {
+        "type": "String"
+      }
+    }
+  },
+  "topicLife": "Everyday life",
+  "topicIdeas": "Ideas",
+  "topicWork": "Work",
+  "walkTitle": "Put a walk on the calendar",
+  "walkText": "I got off one stop early today and walked the rest of the way to work. Those extra ten minutes were enough to notice the tree on the corner had changed color.\n\nNext week I’ll put a walk on my calendar.",
+  "ideasTitle": "Good ideas need a little space",
+  "ideasText": "Sometimes my best ideas arrive when I’m doing nothing. I’d like to leave a little time free each afternoon and see what comes to mind.",
+  "meetingTitle": "Give the next meeting three minutes",
+  "meetingText": "Before our next discussion, let everyone write quietly for three minutes, then take turns sharing. It might give the quieter people a little more room to speak.",
+  "morningTitle": "A small morning ritual",
+  "morningText": "While the kettle heats up, step onto the balcony for a moment. The first thing I do in the morning can simply be watching the sky grow light."
+}

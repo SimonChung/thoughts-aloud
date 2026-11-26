@@ -1,57 +1,85 @@
 import 'package:flutter/foundation.dart';
 
+import 'l10n/generated/app_localizations.dart';
+
 enum Cover { sunset, ripple, steps, blush }
 
-class VoiceCard {
-  const VoiceCard(
-    this.title,
-    this.transcript,
-    this.createdAt,
-    this.seconds,
-    this.topic,
-    this.cover,
-  );
+enum Topic {
+  life,
+  ideas,
+  work;
 
-  final String title;
-  final String transcript;
+  String label(AppLocalizations strings) => switch (this) {
+    life => strings.topicLife,
+    ideas => strings.topicIdeas,
+    work => strings.topicWork,
+  };
+}
+
+typedef CardText = ({String title, String transcript});
+
+sealed class VoiceCard {
+  const VoiceCard(this.createdAt, this.seconds, this.topic, this.cover);
   final DateTime createdAt;
   final int seconds;
-  final String topic;
+  final Topic topic;
   final Cover cover;
+
+  CardText text(AppLocalizations strings);
+}
+
+class RecordedCard extends VoiceCard {
+  const RecordedCard(this.content, DateTime createdAt, int seconds)
+    : super(createdAt, seconds, Topic.life, Cover.ripple);
+
+  final CardText content;
+
+  @override
+  CardText text(AppLocalizations strings) => content;
+}
+
+class _SampleCard extends VoiceCard {
+  const _SampleCard(
+    this.translation,
+    super.createdAt,
+    super.seconds,
+    super.topic,
+    super.cover,
+  );
+  final CardText Function(AppLocalizations) translation;
+
+  @override
+  CardText text(AppLocalizations strings) => translation(strings);
 }
 
 class CardLibrary extends ChangeNotifier {
-  final _cards = [
-    VoiceCard(
-      '把散步留在行事曆裡',
-      '今天提早一站下車，慢慢走到公司。原來只要多出十分鐘，就能注意到路口那棵樹換了顏色。\n\n下週試著把散步也排進行事曆。',
+  final _cards = <VoiceCard>[
+    _SampleCard(
+      (s) => (title: s.walkTitle, transcript: s.walkText),
       DateTime(2026, 11, 26, 9, 12),
       42,
-      '生活',
+      Topic.life,
       Cover.sunset,
     ),
-    VoiceCard(
-      '好點子需要一點空白',
-      '有時候，最好的點子出現在什麼都沒做的時候。想替每天下午留一小段空白，看看會冒出什麼念頭。',
+    _SampleCard(
+      (s) => (title: s.ideasTitle, transcript: s.ideasText),
       DateTime(2026, 11, 25, 17, 35),
       68,
-      '靈感',
+      Topic.ideas,
       Cover.ripple,
     ),
-    VoiceCard(
-      '下次開會，先留三分鐘',
-      '下次討論前，先讓每個人安靜寫三分鐘，再輪流說出想法。也許平常比較安靜的人會有更多空間。',
+    _SampleCard(
+      (s) => (title: s.meetingTitle, transcript: s.meetingText),
       DateTime(2026, 11, 24, 13, 40),
       36,
-      '工作',
+      Topic.work,
       Cover.steps,
     ),
-    VoiceCard(
-      '早晨的小小儀式',
-      '水煮開以前，到陽台站一會兒。早上的第一件事，可以只是看著天慢慢亮起來。',
+    _SampleCard(
+      (s) => (title: s.morningTitle, transcript: s.morningText),
       DateTime(2026, 11, 23, 7, 48),
       54,
-      '生活',
+      Topic.life,
       Cover.blush,
     ),
   ];
@@ -64,17 +92,22 @@ class CardLibrary extends ChangeNotifier {
   int get count => _cards.length;
   bool isSaved(VoiceCard card) => _bookmarks.contains(card);
 
-  Iterable<VoiceCard> search(String query, {required bool savedOnly}) {
+  Iterable<VoiceCard> search(
+    String query,
+    AppLocalizations strings, {
+    required bool savedOnly,
+  }) {
     final key = query.trim().toLowerCase();
-    return _cards.where(
-      (card) =>
-          (!savedOnly || isSaved(card)) &&
-          [
-            card.title,
-            card.transcript,
-            card.topic,
-          ].any((s) => s.toLowerCase().contains(key)),
-    );
+    return _cards.where((card) {
+      if (savedOnly && !isSaved(card)) return false;
+      if (key.isEmpty) return true;
+      final text = card.text(strings);
+      return [
+        text.title,
+        text.transcript,
+        card.topic.label(strings),
+      ].any((value) => value.toLowerCase().contains(key));
+    });
   }
 
   Iterable<VoiceCard> related(VoiceCard card) => _cards

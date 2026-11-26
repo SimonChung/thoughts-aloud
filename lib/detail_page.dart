@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'appearance.dart';
 import 'cards.dart';
+import 'l10n/l10n.dart';
 
 class DetailPage extends StatefulWidget {
   const DetailPage({super.key, required this.card, required this.library});
@@ -61,6 +62,8 @@ class _DetailPageState extends State<DetailPage> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final card = widget.card;
     final library = widget.library;
+    final strings = context.l10n;
+    final text = card.text(strings);
     final local = MaterialLocalizations.of(context);
     return ListenableBuilder(
       listenable: library,
@@ -72,10 +75,12 @@ class _DetailPageState extends State<DetailPage> with WidgetsBindingObserver {
             child: Column(
               children: [
                 PageBar(
-                  '語音卡片',
+                  strings.voiceCard,
                   onBack: () => Navigator.pop(context),
                   trailing: IconButton(
-                    tooltip: saved ? '取消收藏' : '加入收藏',
+                    tooltip: saved
+                        ? strings.removeBookmark
+                        : strings.addBookmark,
                     isSelected: saved,
                     icon: const Icon(Icons.bookmark_outline),
                     selectedIcon: const Icon(Icons.bookmark),
@@ -96,7 +101,7 @@ class _DetailPageState extends State<DetailPage> with WidgetsBindingObserver {
                         ),
                       ),
                       const SizedBox(height: 15),
-                      Text(card.title, style: heading(27)),
+                      Text(text.title, style: heading(27)),
                       const SizedBox(height: 6),
                       Wrap(
                         spacing: 8,
@@ -104,7 +109,14 @@ class _DetailPageState extends State<DetailPage> with WidgetsBindingObserver {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text(
-                            '${local.formatShortDate(card.createdAt)} · ${local.formatTimeOfDay(TimeOfDay.fromDateTime(card.createdAt), alwaysUse24HourFormat: true)}',
+                            strings.cardMetadata(
+                              local.formatShortDate(card.createdAt),
+                              local.formatTimeOfDay(
+                                TimeOfDay.fromDateTime(card.createdAt),
+                                alwaysUse24HourFormat:
+                                    MediaQuery.alwaysUse24HourFormatOf(context),
+                              ),
+                            ),
                             style: smallText,
                           ),
                           Container(
@@ -116,7 +128,10 @@ class _DetailPageState extends State<DetailPage> with WidgetsBindingObserver {
                               border: Border.all(color: line),
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: Text(card.topic, style: smallText),
+                            child: Text(
+                              card.topic.label(strings),
+                              style: smallText,
+                            ),
                           ),
                         ],
                       ),
@@ -135,7 +150,9 @@ class _DetailPageState extends State<DetailPage> with WidgetsBindingObserver {
                           children: [
                             IconButton.filled(
                               onPressed: togglePlay,
-                              tooltip: timer == null ? '播放進度示範' : '暫停播放示範',
+                              tooltip: timer == null
+                                  ? strings.playDemo
+                                  : strings.pauseDemo,
                               icon: Icon(
                                 timer == null ? Icons.play_arrow : Icons.pause,
                               ),
@@ -157,9 +174,15 @@ class _DetailPageState extends State<DetailPage> with WidgetsBindingObserver {
                                     alignment: WrapAlignment.spaceBetween,
                                     spacing: 4,
                                     children: [
-                                      const Text('播放進度示範', style: smallText),
                                       Text(
-                                        '${timecode(position)} / ${timecode(card.seconds)}',
+                                        strings.playbackPreview,
+                                        style: smallText,
+                                      ),
+                                      Text(
+                                        strings.playbackTime(
+                                          timecode(position),
+                                          timecode(card.seconds),
+                                        ),
                                         style: smallText,
                                       ),
                                     ],
@@ -172,14 +195,14 @@ class _DetailPageState extends State<DetailPage> with WidgetsBindingObserver {
                       ),
                     ],
                     trailing: [
-                      Text('逐字稿', style: heading(20)),
+                      Text(strings.transcript, style: heading(20)),
                       const SizedBox(height: 8),
-                      Text(card.transcript, style: prose),
+                      Text(text.transcript, style: prose),
                       const SizedBox(height: 20),
-                      Text('相關卡片', style: heading(20)),
+                      Text(strings.relatedCards, style: heading(20)),
                       const SizedBox(height: 6),
                       if (related.isEmpty)
-                        const Text('目前沒有相同主題的卡片。', style: smallText),
+                        Text(strings.noRelatedCards, style: smallText),
                       for (final other in related)
                         CardTile(
                           other,

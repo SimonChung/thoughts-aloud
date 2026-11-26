@@ -5,8 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'appearance.dart';
 import 'cards.dart';
-
-const _sample = ['剛才走過巷口的時候，', '聽見有人在練琴。', '有些日常的小聲音，', '也值得專程停下來聽。'];
+import 'l10n/l10n.dart';
 
 class StudioPage extends StatefulWidget {
   const StudioPage({super.key});
@@ -15,7 +14,7 @@ class StudioPage extends StatefulWidget {
 }
 
 class _StudioPageState extends State<StudioPage> with WidgetsBindingObserver {
-  final title = TextEditingController(text: '巷口的琴聲');
+  final title = TextEditingController();
   final transcript = TextEditingController();
   final form = GlobalKey<FormState>();
   final titleField = GlobalKey();
@@ -24,10 +23,28 @@ class _StudioPageState extends State<StudioPage> with WidgetsBindingObserver {
   int seconds = 0;
   bool editing = false;
   bool editedTranscript = false;
+  bool editedTitle = false;
+  AppLocalizations? draftLanguage;
   bool confirming = false;
   bool leaving = false;
+  bool showValidation = false;
 
-  String get words => _sample.take(1 + seconds ~/ 6).join();
+  String get words => context.l10n.demoTranscript(switch (seconds ~/ 6) {
+    0 => 'opening',
+    1 => 'piano',
+    2 => 'sounds',
+    _ => 'complete',
+  });
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final strings = context.l10n;
+    if (draftLanguage == strings) return;
+    draftLanguage = strings;
+    if (!editedTitle) title.text = strings.demoTitle;
+    if (editing && !editedTranscript) transcript.text = words;
+  }
 
   @override
   void initState() {
@@ -72,15 +89,16 @@ class _StudioPageState extends State<StudioPage> with WidgetsBindingObserver {
   }
 
   void save() {
-    if (leaving || !form.currentState!.validate()) return;
+    if (leaving) return;
+    if (!form.currentState!.validate()) {
+      setState(() => showValidation = true);
+      return;
+    }
     leaving = true;
-    final card = VoiceCard(
-      title.text.trim(),
-      transcript.text.trim(),
+    final card = RecordedCard(
+      (title: title.text.trim(), transcript: transcript.text.trim()),
       DateTime.now(),
       math.max(1, seconds),
-      '生活',
-      Cover.ripple,
     );
     Navigator.pop(context, card);
   }
@@ -98,16 +116,17 @@ class _StudioPageState extends State<StudioPage> with WidgetsBindingObserver {
     final discard = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('離開這段錄音？'),
-        content: const Text('這段示範錄音尚未存成卡片。'),
+        scrollable: true,
+        title: Text(dialogContext.l10n.leaveTitle),
+        content: Text(dialogContext.l10n.leaveMessage),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('捨棄錄音'),
+            child: Text(dialogContext.l10n.discardRecording),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('保留錄音'),
+            child: Text(dialogContext.l10n.keepRecording),
           ),
         ],
       ),
@@ -127,12 +146,12 @@ class _StudioPageState extends State<StudioPage> with WidgetsBindingObserver {
     final toggle = OutlinedButton.icon(
       onPressed: () => setState(timer == null ? start : pause),
       icon: Icon(timer == null ? Icons.mic_none : Icons.pause, size: 18),
-      label: Text(timer == null ? '繼續' : '暫停'),
+      label: Text(timer == null ? context.l10n.resume : context.l10n.pause),
     );
     final done = FilledButton.icon(
       onPressed: finish,
       icon: const Icon(Icons.stop, size: 18),
-      label: const Text('完成錄音'),
+      label: Text(context.l10n.finishRecording),
     );
     return Container(
       decoration: const BoxDecoration(
@@ -162,7 +181,7 @@ class _StudioPageState extends State<StudioPage> with WidgetsBindingObserver {
   Widget monitor() => PageSections(
     actions: controls(),
     leading: [
-      Text('錄音室', style: heading(32)),
+      Text(context.l10n.studioTitle, style: heading(32)),
       const SizedBox(height: 16),
       ClipRRect(
         borderRadius: BorderRadius.circular(15),
@@ -198,7 +217,11 @@ class _StudioPageState extends State<StudioPage> with WidgetsBindingObserver {
                               ),
                             ),
                             const SizedBox(width: 7),
-                            Text(timer == null ? '已暫停' : '錄音中'),
+                            Text(
+                              timer == null
+                                  ? context.l10n.paused
+                                  : context.l10n.recording,
+                            ),
                           ],
                         ),
                         Container(
@@ -210,7 +233,7 @@ class _StudioPageState extends State<StudioPage> with WidgetsBindingObserver {
                             horizontal: 6,
                             vertical: 2,
                           ),
-                          child: const Text('示範模式'),
+                          child: Text(context.l10n.demoMode),
                         ),
                       ],
                     ),
@@ -243,10 +266,14 @@ class _StudioPageState extends State<StudioPage> with WidgetsBindingObserver {
                     ),
                     const Divider(height: 1, color: Color(0xff80927d)),
                     const SizedBox(height: 5),
-                    const Wrap(
+                    Wrap(
                       alignment: WrapAlignment.spaceBetween,
                       spacing: 4,
-                      children: [Text('−6 s'), Text('−3 s'), Text('現在')],
+                      children: [
+                        Text(context.l10n.secondsAgo(6)),
+                        Text(context.l10n.secondsAgo(3)),
+                        Text(context.l10n.now),
+                      ],
                     ),
                   ],
                 ),
@@ -259,7 +286,9 @@ class _StudioPageState extends State<StudioPage> with WidgetsBindingObserver {
     trailing: [
       Row(
         children: [
-          Expanded(child: Text('即時逐字稿', style: heading(23))),
+          Expanded(
+            child: Text(context.l10n.liveTranscript, style: heading(23)),
+          ),
           const Icon(Icons.notes, size: 18, color: muted),
         ],
       ),
@@ -274,29 +303,34 @@ class _StudioPageState extends State<StudioPage> with WidgetsBindingObserver {
         child: Text(words, style: prose),
       ),
       const SizedBox(height: 16),
-      const Text('此處以範例文字示範錄音流程。', style: smallText),
+      Text(context.l10n.demoNote, style: smallText),
     ],
   );
 
   Widget editor() => Form(
     key: form,
+    autovalidateMode: showValidation
+        ? AutovalidateMode.always
+        : AutovalidateMode.disabled,
     child: PageSections(
       spacing: 16,
       leading: [
-        Text('整理語音卡片', style: heading(32)),
+        Text(context.l10n.editCard, style: heading(32)),
         const SizedBox(height: 8),
-        Text('示範錄音 · ${timecode(seconds)} · 僅保留在本次使用期間', style: smallText),
+        Text(context.l10n.demoDuration(timecode(seconds)), style: smallText),
         const SizedBox(height: 24),
         TextFormField(
           key: titleField,
           controller: title,
+          onChanged: (_) => editedTitle = true,
           maxLength: 100,
-          decoration: const InputDecoration(
-            labelText: '卡片標題',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: context.l10n.cardTitle,
+            border: const OutlineInputBorder(),
           ),
           textInputAction: TextInputAction.next,
-          validator: (s) => (s ?? '').trim().isEmpty ? '請填寫卡片標題。' : null,
+          validator: (s) =>
+              (s ?? '').trim().isEmpty ? context.l10n.missingTitle : null,
         ),
       ],
       trailing: [
@@ -307,18 +341,19 @@ class _StudioPageState extends State<StudioPage> with WidgetsBindingObserver {
           maxLines: null,
           style: prose,
           onChanged: (_) => editedTranscript = true,
-          decoration: const InputDecoration(
-            labelText: '逐字稿',
+          decoration: InputDecoration(
+            labelText: context.l10n.transcript,
             alignLabelWithHint: true,
-            border: OutlineInputBorder(),
+            border: const OutlineInputBorder(),
           ),
-          validator: (s) => (s ?? '').trim().isEmpty ? '請填寫逐字稿。' : null,
+          validator: (s) =>
+              (s ?? '').trim().isEmpty ? context.l10n.missingTranscript : null,
         ),
         const SizedBox(height: 20),
         FilledButton.icon(
           onPressed: save,
           icon: const Icon(Icons.check),
-          label: const Text('儲存卡片'),
+          label: Text(context.l10n.saveCard),
         ),
       ],
     ),
@@ -334,7 +369,10 @@ class _StudioPageState extends State<StudioPage> with WidgetsBindingObserver {
       body: PageBody(
         child: Column(
           children: [
-            PageBar(editing ? '錄音室' : '語音卡片', onBack: back),
+            PageBar(
+              editing ? context.l10n.studioTitle : context.l10n.voiceCard,
+              onBack: back,
+            ),
             Expanded(child: editing ? editor() : monitor()),
           ],
         ),

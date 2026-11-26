@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'appearance.dart';
 import 'cards.dart';
+import 'l10n/l10n.dart';
 import 'detail_page.dart';
 import 'studio_page.dart';
 
@@ -89,21 +90,24 @@ class _LibraryPageState extends State<LibraryPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('想唸', style: heading(26)),
-                      const Text(
-                        'Thoughts Aloud',
-                        style: TextStyle(
-                          fontFamily: 'Georgia',
-                          fontStyle: FontStyle.italic,
-                          fontSize: 12,
-                          color: ink,
+                      Text(context.l10n.appName, style: heading(26)),
+                      if (context.l10n.brandSignature.isNotEmpty)
+                        Text(
+                          context.l10n.brandSignature,
+                          style: const TextStyle(
+                            fontFamily: 'Georgia',
+                            fontStyle: FontStyle.italic,
+                            fontSize: 12,
+                            color: ink,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
                 IconButton(
-                  tooltip: searching ? '關閉搜尋' : '搜尋卡片',
+                  tooltip: searching
+                      ? context.l10n.closeSearch
+                      : context.l10n.searchCards,
                   icon: Icon(searching ? Icons.close : Icons.search),
                   onPressed: () => setState(() {
                     searching = !searching;
@@ -118,7 +122,7 @@ class _LibraryPageState extends State<LibraryPage> {
               listenable: library,
               builder: (context, _) {
                 final cards = library
-                    .search(search.text, savedOnly: savedOnly)
+                    .search(search.text, context.l10n, savedOnly: savedOnly)
                     .toList();
                 return PageSections(
                   leading: [_RecordingBanner(onStart: record)],
@@ -127,8 +131,16 @@ class _LibraryPageState extends State<LibraryPage> {
                   trailing: [
                     Row(
                       children: [
-                        Expanded(child: Text('我的卡片匣', style: heading(23))),
-                        Text('${library.count} 張卡片', style: smallText),
+                        Expanded(
+                          child: Text(
+                            context.l10n.libraryTitle,
+                            style: heading(23),
+                          ),
+                        ),
+                        Text(
+                          context.l10n.cardCount(library.count),
+                          style: smallText,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -137,7 +149,11 @@ class _LibraryPageState extends State<LibraryPage> {
                       children: [
                         for (final saved in [false, true])
                           ChoiceChip(
-                            label: Text(saved ? '收藏' : '全部'),
+                            label: Text(
+                              saved
+                                  ? context.l10n.savedCards
+                                  : context.l10n.allCards,
+                            ),
                             avatar: saved
                                 ? Icon(
                                     Icons.bookmark_outline,
@@ -170,9 +186,9 @@ class _LibraryPageState extends State<LibraryPage> {
                           controller: search,
                           autofocus: true,
                           onChanged: (_) => setState(() {}),
-                          decoration: const InputDecoration(
-                            labelText: '搜尋標題或逐字稿',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: context.l10n.searchHint,
+                            border: const OutlineInputBorder(),
                           ),
                           textInputAction: TextInputAction.search,
                         ),
@@ -182,8 +198,8 @@ class _LibraryPageState extends State<LibraryPage> {
                         padding: const EdgeInsets.symmetric(vertical: 22),
                         child: Text(
                           search.text.trim().isEmpty
-                              ? '還沒有收藏。打開卡片，點一下書籤就能在這裡找到它。'
-                              : '找不到符合的卡片，試試其他關鍵字。',
+                              ? context.l10n.noBookmarks
+                              : context.l10n.noMatches,
                           style: prose,
                         ),
                       ),
@@ -240,12 +256,15 @@ class _RecordingBanner extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('把想法\n說下來。', style: heading(31, color: paper)),
+                    Text(
+                      context.l10n.bannerTitle,
+                      style: heading(31, color: paper),
+                    ),
                     const SizedBox(height: 14),
                     FilledButton.icon(
                       onPressed: onStart,
                       icon: const Icon(Icons.mic_none, size: 19),
-                      label: const Text('開始錄音'),
+                      label: Text(context.l10n.startRecording),
                       style: FilledButton.styleFrom(
                         backgroundColor: lime,
                         foregroundColor: ink,
