@@ -78,6 +78,8 @@ flutter run
 | 今天是星期五，我想喝一杯咖啡。請幫我記錄這段語音。 | 1.5 秒，顯示「今天是」 | 卡片保留逐字稿，「記錄」誤辨為「進入」。 |
 | 明天下午三點，我要搭火車去台北，記得帶藍色的雨傘。 | 2.0 秒，顯示「明天」 | 卡片保留完整句子。 |
 
+2026-11-27 在已套用上述模型的 iPhone 17 模擬器（iOS 27.2）手動實測「想唸」，確認錄音正常，繁中即時逐字稿也會在說話時持續更新。
+
 ## 套件清單
 
 [Pub 套件 SBOM](sbom/pub.cdx.json) 與 [Android Gradle 元件 SBOM](sbom/android.cdx.json) 採用 CycloneDX 格式，Pub 元件依鎖檔產生，直接、開發與間接相依關係依 `dart pub deps --json` 核對。Android 清單涵蓋應用與測試組態的 Gradle 解析結果。
