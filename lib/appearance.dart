@@ -260,8 +260,9 @@ class CardTile extends StatelessWidget {
 }
 
 class Waveform extends CustomPainter {
-  const Waveform({this.phase = 4, this.progress = 0, this.studio = false});
-  final double phase, progress;
+  const Waveform({this.levels, this.progress = 0, this.studio = false});
+  final List<double>? levels;
+  final double progress;
   final bool studio;
 
   @override
@@ -277,11 +278,18 @@ class Waveform extends CustomPainter {
       );
     }
     for (var i = 0; i < count; i++) {
-      final n = i + phase;
+      final n = i + 4;
       final envelope =
           .24 + .76 * (math.sin(n * .106) * math.cos(n * .049)).abs();
       final peak = .13 + .87 * (math.sin(n * 1.77) * math.cos(n * .49)).abs();
-      final height = math.max(2.0, size.height * envelope * peak);
+      final samples = levels;
+      final index = (34 * i ~/ count) - (34 - (samples?.length ?? 0));
+      final amplitude = samples == null
+          ? envelope * peak
+          : index < 0
+          ? 0.0
+          : samples[index];
+      final height = math.max(2.0, size.height * amplitude);
       paint.color = studio
           ? lime
           : (i / count < progress ? pine : const Color(0xff879878));
@@ -299,7 +307,7 @@ class Waveform extends CustomPainter {
 
   @override
   bool shouldRepaint(Waveform oldDelegate) =>
-      phase != oldDelegate.phase ||
+      levels != oldDelegate.levels ||
       progress != oldDelegate.progress ||
       studio != oldDelegate.studio;
 }

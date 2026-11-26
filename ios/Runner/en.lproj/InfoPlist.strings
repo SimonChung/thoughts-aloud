@@ -1,1 +1,3 @@
 "CFBundleDisplayName" = "Thoughts Aloud";
+"NSMicrophoneUsageDescription" = "Record the audio for your voice cards.";
+"NSSpeechRecognitionUsageDescription" = "Transcribe your voice cards on this device.";

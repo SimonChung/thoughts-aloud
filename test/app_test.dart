@@ -1,12 +1,45 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:thoughts_aloud/l10n/l10n.dart';
 import 'package:thoughts_aloud/main.dart';
+import 'package:thoughts_aloud/cards.dart';
+import 'package:thoughts_aloud/card_store.dart';
+import 'package:thoughts_aloud/voice_media.dart';
+
+class MemoryStore extends CardStore {
+  final cards = <RecordedCard>[];
+  final bookmarks = <String, bool>{};
+
+  @override
+  Future<LibraryContents> load() async => (cards: cards, bookmarks: bookmarks);
+
+  @override
+  Future<void> bookmark(String id, bool saved) async => bookmarks[id] = saved;
+
+  @override
+  Future<RecordedCard> save(
+    VoiceDraft draft,
+    CardText text,
+    DateTime date,
+    int seconds,
+  ) async {
+    final card = RecordedCard(draft.id, text, date, seconds, draft.path);
+    cards.add(card);
+    return card;
+  }
+}
 
 Future<void> launch(
   WidgetTester tester, {
   Size size = const Size(393, 852),
   double scale = 1,
+  bool micAllowed = true,
+  Completer<String?>? setup,
+  List<String?>? recordingLocales,
+  String recognized = '在窗邊聽見旋律。',
+  List<String>? calls,
   Locale locale = const Locale.fromSubtags(
     languageCode: 'zh',
     scriptCode: 'Hant',
@@ -20,7 +53,58 @@ Future<void> launch(
   tester.platformDispatcher.textScaleFactorTestValue = scale;
   addTearDown(tester.view.reset);
   addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-  await tester.pumpWidget(const ThoughtsAloudApp());
+  final clock = tester.binding.clock;
+  DateTime? start;
+  var recorded = Duration.zero;
+  var playerPosition = 0;
+  tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(voiceChannel, (
+    call,
+  ) async {
+    calls?.add(call.method);
+    switch (call.method) {
+      case 'access':
+        return micAllowed;
+      case 'prepareSpeech':
+        return setup != null
+            ? await setup.future
+            : (call.arguments['locale'] == 'zh-TW' ? 'cmn-Hant-TW' : 'en-US');
+      case 'skipSpeechSetup':
+        if (setup != null && !setup.isCompleted) setup.complete(null);
+        return null;
+      case 'draft':
+        return {'id': 'test-id', 'path': '/draft/voice.wav'};
+      case 'play':
+        playerPosition = call.arguments['position'];
+        return null;
+      case 'player':
+        return {'position': playerPosition += 200, 'playing': true};
+      case 'discard':
+      case 'stopPlayer':
+        return null;
+      case 'start':
+        recordingLocales?.add(call.arguments['locale'] as String?);
+        start ??= clock.now();
+      case 'pause':
+      case 'finish':
+        if (start != null) recorded += clock.now().difference(start!);
+        start = null;
+      case 'status':
+        break;
+      default:
+        throw StateError(call.method);
+    }
+    final elapsed =
+        recorded +
+        (start == null ? Duration.zero : clock.now().difference(start!));
+    return {
+      'milliseconds': elapsed.inMilliseconds,
+      'running': start != null,
+      'level': 0.3,
+      'text': recognized,
+      'transcribing': recognized.isNotEmpty && start != null,
+    };
+  });
+  await tester.pumpWidget(ThoughtsAloudApp(store: MemoryStore()));
   await tester.pumpAndSettle();
 }
 
@@ -33,11 +117,12 @@ Future<void> tap(WidgetTester tester, Finder target) async {
 
 void main() {
   testWidgets('錄音能暫停、繼續、編輯並存回卡片匣', (tester) async {
-    await launch(tester);
+    final calls = <String>[];
+    await launch(tester, calls: calls);
     expect(find.text('想唸'), findsOneWidget);
     await tap(tester, find.text('開始錄音'));
     await tester.pump(const Duration(seconds: 6));
-    expect(find.textContaining('聽見有人在練琴'), findsOneWidget);
+    expect(find.text('在窗邊聽見旋律。'), findsOneWidget);
     await tap(tester, find.text('暫停'));
     final clock = tester
         .widget<Text>(find.textContaining(RegExp(r'^\d+:\d+$')))
@@ -58,6 +143,22 @@ void main() {
     await tap(tester, find.text('儲存卡片'));
     expect(find.text('巷口的聲音'), findsOneWidget);
     expect(find.text('在窗邊聽見一段旋律。'), findsOneWidget);
+    await tap(tester, find.byTooltip('播放錄音'));
+    await tester.pump(const Duration(seconds: 1));
+    await tap(tester, find.byTooltip('暫停播放'));
+    expect(
+      calls,
+      containsAllInOrder([
+        'start',
+        'pause',
+        'start',
+        'pause',
+        'finish',
+        'play',
+        'player',
+        'stopPlayer',
+      ]),
+    );
     await tap(tester, find.byTooltip('加入收藏'));
     await tap(tester, find.byTooltip('返回'));
     expect(find.text('5 張卡片'), findsOneWidget);
@@ -71,6 +172,26 @@ void main() {
     await tester.enterText(find.byType(TextField), '找不到這段文字');
     await tester.pumpAndSettle();
     expect(find.textContaining('找不到符合的卡片'), findsOneWidget);
+  });
+
+  testWidgets('繁中錄音使用裝置模型標籤，下載期間也可直接只錄音', (tester) async {
+    final locales = <String?>[];
+    await launch(tester, recordingLocales: locales);
+    await tap(tester, find.text('開始錄音'));
+    expect(locales, ['cmn-Hant-TW']);
+    await tap(tester, find.byTooltip('返回'));
+    await tap(tester, find.text('捨棄錄音'));
+    await launch(
+      tester,
+      setup: Completer<String?>(),
+      recordingLocales: locales,
+    );
+    await tap(tester, find.text('開始錄音'));
+    expect(find.textContaining('可能需要下載模型'), findsOneWidget);
+    expect(locales.length, 1);
+    await tap(tester, find.text('先只錄音'));
+    expect(locales, ['cmn-Hant-TW', null]);
+    expect(find.text('錄音中'), findsOneWidget);
   });
 
   testWidgets('詳情可播放到結尾、重播及往返相關卡片', (tester) async {
@@ -126,7 +247,7 @@ void main() {
       tester.getTopRight(find.text('錄音室')).dx,
       lessThan(tester.getTopLeft(find.text('即時逐字稿')).dx),
     );
-    expect(find.textContaining('聽見有人在練琴'), findsOneWidget);
+    expect(find.text('在窗邊聽見旋律。'), findsOneWidget);
     await tap(tester, find.text('完成錄音'));
     final fields = find.byType(TextFormField);
     await tester.enterText(fields.first, '橫放的平板');
@@ -197,17 +318,21 @@ void main() {
     expect(find.text('早晨的小小儀式'), findsNothing);
   });
 
-  testWidgets('切換語言會更新錄音範例與驗證提示，保留使用者輸入', (tester) async {
-    await launch(tester, locale: const Locale('en', 'GB'));
+  testWidgets('切換語言會更新驗證提示，保留辨識原文與使用者輸入', (tester) async {
+    await launch(
+      tester,
+      locale: const Locale('en', 'GB'),
+      recognized: 'I heard a piano.',
+    );
     await tap(tester, find.text('Start recording'));
     await tester.pump(const Duration(seconds: 7));
-    expect(find.textContaining('practicing the piano'), findsOneWidget);
+    expect(find.text('I heard a piano.'), findsOneWidget);
     await tap(tester, find.text('Pause'));
     await tap(tester, find.text('Finish recording'));
     final fields = find.byType(TextFormField);
     expect(
       tester.widget<TextFormField>(fields.first).controller!.text,
-      'Piano around the corner',
+      'I heard a piano.',
     );
     await tester.enterText(fields.first, '');
     await tap(tester, find.text('Save card'));
@@ -221,7 +346,7 @@ void main() {
     );
     expect(
       tester.widget<TextFormField>(fields.last).controller!.text,
-      contains('聽見有人在練琴'),
+      'I heard a piano.',
     );
     await tester.enterText(fields.first, 'My 日記');
     await tester.enterText(fields.last, '第一段：Hello.');
@@ -236,6 +361,23 @@ void main() {
     expect(find.text('My 日記'), findsOneWidget);
     expect(find.text('第一段：Hello.'), findsOneWidget);
     expect(find.text('生活'), findsOneWidget);
+  });
+
+  testWidgets('拒絕麥克風權限可返回，辨識離線時仍可單獨儲存錄音', (tester) async {
+    final calls = <String>[];
+    await launch(tester, micAllowed: false, calls: calls);
+    await tap(tester, find.text('開始錄音'));
+    expect(find.textContaining('麥克風權限'), findsOneWidget);
+    expect(calls, isNot(contains('start')));
+    await tap(tester, find.byTooltip('返回'));
+    await launch(tester, recognized: '');
+    await tap(tester, find.text('開始錄音'));
+    await tester.pump(const Duration(seconds: 2));
+    await tap(tester, find.text('完成錄音'));
+    await tester.enterText(find.byType(TextFormField).first, '原音');
+    await tap(tester, find.text('儲存卡片'));
+    expect(find.text('這段錄音沒有逐字稿。'), findsOneWidget);
+    expect(find.byTooltip('播放錄音'), findsOneWidget);
   });
 
   testWidgets('英文窄螢幕放大字級仍可操作錄音及返回對話框', (tester) async {

@@ -4,18 +4,21 @@ import 'package:material_ui/material_ui.dart';
 
 import 'appearance.dart';
 import 'cards.dart';
+import 'card_store.dart';
 import 'l10n/l10n.dart';
 import 'detail_page.dart';
 import 'studio_page.dart';
 
 class LibraryPage extends StatefulWidget {
-  const LibraryPage({super.key});
+  const LibraryPage({super.key, this.store});
+  final CardStore? store;
   @override
   State<LibraryPage> createState() => _LibraryPageState();
 }
 
 class _LibraryPageState extends State<LibraryPage> {
-  final library = CardLibrary();
+  late final library = CardLibrary(widget.store ?? CardStore());
+  late Future<void> loading = library.load();
   final search = TextEditingController();
   final searchField = GlobalKey();
   bool savedOnly = false;
@@ -36,20 +39,41 @@ class _LibraryPageState extends State<LibraryPage> {
 
   Future<void> record() async {
     FocusManager.instance.primaryFocus?.unfocus();
-    final card = await Navigator.of(context)
-        .push(MaterialPageRoute<VoiceCard>(builder: (_) => const StudioPage()));
+    final card = await Navigator.of(context).push(
+      MaterialPageRoute<VoiceCard>(
+        builder: (_) => StudioPage(library: library),
+      ),
+    );
     if (!mounted || card == null) return;
     setState(() {
       savedOnly = false;
       searching = false;
       search.clear();
     });
-    library.add(card);
     open(card);
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => FutureBuilder<void>(
+    future: loading,
+    builder: (context, state) {
+      if (state.connectionState != ConnectionState.done || state.hasError) {
+        return Scaffold(
+          body: Center(
+            child: state.hasError
+                ? TextButton(
+                    onPressed: () => setState(() => loading = library.load()),
+                    child: Text(context.l10n.retryLibrary),
+                  )
+                : const CircularProgressIndicator(),
+          ),
+        );
+      }
+      return libraryView(context);
+    },
+  );
+
+  Widget libraryView(BuildContext context) => Scaffold(
     body: PageBody(
       child: Column(
         children: [

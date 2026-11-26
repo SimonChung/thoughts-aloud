@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'card_store.dart';
+import 'voice_media.dart';
 import 'l10n/generated/app_localizations.dart';
 
 enum Cover { sunset, ripple, steps, blush }
@@ -19,7 +21,14 @@ enum Topic {
 typedef CardText = ({String title, String transcript});
 
 sealed class VoiceCard {
-  const VoiceCard(this.createdAt, this.seconds, this.topic, this.cover);
+  const VoiceCard(
+    this.id,
+    this.createdAt,
+    this.seconds,
+    this.topic,
+    this.cover,
+  );
+  final String id;
   final DateTime createdAt;
   final int seconds;
   final Topic topic;
@@ -29,9 +38,15 @@ sealed class VoiceCard {
 }
 
 class RecordedCard extends VoiceCard {
-  const RecordedCard(this.content, DateTime createdAt, int seconds)
-    : super(createdAt, seconds, Topic.life, Cover.ripple);
+  const RecordedCard(
+    String id,
+    this.content,
+    DateTime createdAt,
+    int seconds,
+    this.audioPath,
+  ) : super(id, createdAt, seconds, Topic.life, Cover.ripple);
 
+  final String audioPath;
   final CardText content;
 
   @override
@@ -40,6 +55,7 @@ class RecordedCard extends VoiceCard {
 
 class _SampleCard extends VoiceCard {
   const _SampleCard(
+    super.id,
     this.translation,
     super.createdAt,
     super.seconds,
@@ -55,6 +71,7 @@ class _SampleCard extends VoiceCard {
 class CardLibrary extends ChangeNotifier {
   final _cards = <VoiceCard>[
     _SampleCard(
+      'sample-walk',
       (s) => (title: s.walkTitle, transcript: s.walkText),
       DateTime(2026, 11, 26, 9, 12),
       42,
@@ -62,6 +79,7 @@ class CardLibrary extends ChangeNotifier {
       Cover.sunset,
     ),
     _SampleCard(
+      'sample-ideas',
       (s) => (title: s.ideasTitle, transcript: s.ideasText),
       DateTime(2026, 11, 25, 17, 35),
       68,
@@ -69,6 +87,7 @@ class CardLibrary extends ChangeNotifier {
       Cover.ripple,
     ),
     _SampleCard(
+      'sample-meeting',
       (s) => (title: s.meetingTitle, transcript: s.meetingText),
       DateTime(2026, 11, 24, 13, 40),
       36,
@@ -76,6 +95,7 @@ class CardLibrary extends ChangeNotifier {
       Cover.steps,
     ),
     _SampleCard(
+      'sample-morning',
       (s) => (title: s.morningTitle, transcript: s.morningText),
       DateTime(2026, 11, 23, 7, 48),
       54,
@@ -83,14 +103,30 @@ class CardLibrary extends ChangeNotifier {
       Cover.blush,
     ),
   ];
-  final _bookmarks = <VoiceCard>{};
+  final CardStore store;
+  final _bookmarks = <String>{'sample-ideas'};
+  final _saving = <String>{};
 
-  CardLibrary() {
-    _bookmarks.add(_cards.firstWhere((card) => card.cover == Cover.ripple));
+  CardLibrary(this.store);
+
+  Future<void> load() async {
+    final data = await store.load();
+    _cards.removeWhere((card) => card is RecordedCard);
+    _cards.insertAll(0, data.cards);
+    _bookmarks.clear();
+    _bookmarks.add('sample-ideas');
+    for (final entry in data.bookmarks.entries) {
+      if (entry.value) {
+        _bookmarks.add(entry.key);
+      } else {
+        _bookmarks.remove(entry.key);
+      }
+    }
   }
 
   int get count => _cards.length;
-  bool isSaved(VoiceCard card) => _bookmarks.contains(card);
+  bool isSaved(VoiceCard card) => _bookmarks.contains(card.id);
+  bool saving(VoiceCard card) => _saving.contains(card.id);
 
   Iterable<VoiceCard> search(
     String query,
@@ -114,14 +150,32 @@ class CardLibrary extends ChangeNotifier {
       .where((other) => other != card && other.topic == card.topic)
       .take(2);
 
-  void toggleBookmark(VoiceCard card) {
-    if (!_bookmarks.remove(card)) _bookmarks.add(card);
+  Future<void> toggleBookmark(VoiceCard card) async {
+    if (!_saving.add(card.id)) return;
+    final saved = !isSaved(card);
     notifyListeners();
+    try {
+      await store.bookmark(card.id, saved);
+      if (saved) {
+        _bookmarks.add(card.id);
+      } else {
+        _bookmarks.remove(card.id);
+      }
+    } finally {
+      _saving.remove(card.id);
+      notifyListeners();
+    }
   }
 
-  void add(VoiceCard card) {
+  Future<RecordedCard> save(
+    VoiceDraft draft,
+    CardText content,
+    int seconds,
+  ) async {
+    final card = await store.save(draft, content, DateTime.now(), seconds);
     _cards.insert(0, card);
     notifyListeners();
+    return card;
   }
 }
 

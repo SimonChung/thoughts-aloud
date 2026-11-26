@@ -1,13 +1,15 @@
 import 'package:material_ui/material_ui.dart';
 
 import 'appearance.dart';
+import 'card_store.dart';
 import 'l10n/l10n.dart';
 import 'library_page.dart';
 
 void main() => runApp(const ThoughtsAloudApp());
 
 class ThoughtsAloudApp extends StatelessWidget {
-  const ThoughtsAloudApp({super.key});
+  const ThoughtsAloudApp({super.key, this.store});
+  final CardStore? store;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -22,6 +24,6 @@ class ThoughtsAloudApp extends StatelessWidget {
       AppLocalizations.delegate,
       ...GlobalMaterialLocalizations.delegates,
     ],
-    home: const LibraryPage(),
+    home: LibraryPage(store: store),
   );
 }

@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'appearance.dart';
 import 'cards.dart';
+import 'voice_media.dart';
 import 'l10n/l10n.dart';
 
 class DetailPage extends StatefulWidget {
@@ -17,6 +18,14 @@ class DetailPage extends StatefulWidget {
 class _DetailPageState extends State<DetailPage> with WidgetsBindingObserver {
   Timer? timer;
   int position = 0;
+  int positionMs = 0;
+  bool pending = false;
+  bool polling = false;
+  int generation = 0;
+  String? get audioPath => switch (widget.card) {
+    RecordedCard(:final audioPath) => audioPath,
+    _ => null,
+  };
 
   @override
   void initState() {
@@ -25,16 +34,90 @@ class _DetailPageState extends State<DetailPage> with WidgetsBindingObserver {
   }
 
   void pause() {
+    generation++;
+    final path = audioPath;
+    if (path != null) {
+      unawaited(voiceChannel.invokeMethod<void>('stopPlayer', {'path': path}));
+    }
     timer?.cancel();
     timer = null;
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed && timer != null) setState(pause);
+    if (state != AppLifecycleState.resumed && (timer != null || pending)) {
+      setState(pause);
+    }
   }
 
-  void togglePlay() {
+  Future<void> togglePlay() async {
+    if (pending) return;
+    final path = audioPath;
+    if (path == null) {
+      togglePreview();
+      return;
+    }
+    if (timer != null) {
+      setState(pause);
+      return;
+    }
+    final token = ++generation;
+    setState(() => pending = true);
+    try {
+      if (position >= widget.card.seconds) {
+        positionMs = 0;
+        position = 0;
+      }
+      await voiceChannel.invokeMethod<void>('play', {
+        'path': path,
+        'position': positionMs,
+      });
+      if (!mounted || generation != token) return;
+      setState(
+        () => timer = Timer.periodic(
+          const Duration(milliseconds: 180),
+          (_) => refreshPlayer(path, token),
+        ),
+      );
+    } catch (_) {
+      if (mounted && generation == token) playbackError();
+    } finally {
+      if (mounted) setState(() => pending = false);
+    }
+  }
+
+  Future<void> refreshPlayer(String path, int token) async {
+    if (polling) return;
+    polling = true;
+    try {
+      final data = (await voiceChannel.invokeMapMethod<String, dynamic>(
+        'player',
+        {'path': path},
+      ))!;
+      if (!mounted || generation != token) return;
+      setState(() {
+        positionMs = data['position'] as int;
+        position = (positionMs ~/ 1000).clamp(0, widget.card.seconds);
+        if (data['playing'] != true) {
+          if (data['completed'] == true) position = widget.card.seconds;
+          pause();
+        }
+      });
+    } catch (_) {
+      if (mounted && generation == token) {
+        setState(pause);
+        playbackError();
+      }
+    } finally {
+      polling = false;
+    }
+  }
+
+  void playbackError() =>
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(context.l10n.playError)));
+
+  void togglePreview() {
     setState(() {
       if (timer != null) {
         pause();
@@ -84,7 +167,19 @@ class _DetailPageState extends State<DetailPage> with WidgetsBindingObserver {
                     isSelected: saved,
                     icon: const Icon(Icons.bookmark_outline),
                     selectedIcon: const Icon(Icons.bookmark),
-                    onPressed: () => library.toggleBookmark(card),
+                    onPressed: library.saving(card)
+                        ? null
+                        : () async {
+                            try {
+                              await library.toggleBookmark(card);
+                            } catch (_) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(strings.saveError)),
+                                );
+                              }
+                            }
+                          },
                   ),
                 ),
                 Expanded(
@@ -149,10 +244,14 @@ class _DetailPageState extends State<DetailPage> with WidgetsBindingObserver {
                         child: Row(
                           children: [
                             IconButton.filled(
-                              onPressed: togglePlay,
+                              onPressed: pending ? null : togglePlay,
                               tooltip: timer == null
-                                  ? strings.playDemo
-                                  : strings.pauseDemo,
+                                  ? (audioPath == null
+                                        ? strings.playDemo
+                                        : strings.playAudio)
+                                  : (audioPath == null
+                                        ? strings.pauseDemo
+                                        : strings.pauseAudio),
                               icon: Icon(
                                 timer == null ? Icons.play_arrow : Icons.pause,
                               ),
@@ -175,7 +274,9 @@ class _DetailPageState extends State<DetailPage> with WidgetsBindingObserver {
                                     spacing: 4,
                                     children: [
                                       Text(
-                                        strings.playbackPreview,
+                                        audioPath == null
+                                            ? strings.playbackPreview
+                                            : strings.recordedAudio,
                                         style: smallText,
                                       ),
                                       Text(
@@ -197,7 +298,12 @@ class _DetailPageState extends State<DetailPage> with WidgetsBindingObserver {
                     trailing: [
                       Text(strings.transcript, style: heading(20)),
                       const SizedBox(height: 8),
-                      Text(text.transcript, style: prose),
+                      Text(
+                        text.transcript.isEmpty
+                            ? strings.noTranscript
+                            : text.transcript,
+                        style: prose,
+                      ),
                       const SizedBox(height: 20),
                       Text(strings.relatedCards, style: heading(20)),
                       const SizedBox(height: 6),

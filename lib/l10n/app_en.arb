@@ -73,7 +73,6 @@
   "finishRecording": "Finish recording",
   "recording": "Recording",
   "paused": "Paused",
-  "demoMode": "Demo mode",
   "secondsAgo": "−{seconds} s",
   "@secondsAgo": {
     "placeholders": {
@@ -84,33 +83,14 @@
   },
   "now": "Now",
   "liveTranscript": "Live transcript",
-  "demoNote": "This demo uses a sample transcript.",
   "leaveTitle": "Leave this recording?",
-  "leaveMessage": "This demo recording hasn’t been saved as a card yet.",
+  "leaveMessage": "This recording hasn’t been saved as a card yet.",
   "discardRecording": "Discard recording",
   "keepRecording": "Keep recording",
   "editCard": "Edit voice card",
-  "demoDuration": "Demo recording · {duration} · This session only",
-  "@demoDuration": {
-    "placeholders": {
-      "duration": {
-        "type": "String"
-      }
-    }
-  },
   "cardTitle": "Card title",
   "missingTitle": "Enter a card title.",
-  "missingTranscript": "Enter a transcript.",
   "saveCard": "Save card",
-  "demoTitle": "Piano around the corner",
-  "demoTranscript": "{stage, select, opening{As I turned the corner,} piano{As I turned the corner, I heard someone practicing the piano.} sounds{As I turned the corner, I heard someone practicing the piano. Some everyday sounds} other{As I turned the corner, I heard someone practicing the piano. Some everyday sounds are worth stopping for.}}",
-  "@demoTranscript": {
-    "placeholders": {
-      "stage": {
-        "type": "String"
-      }
-    }
-  },
   "topicLife": "Everyday life",
   "topicIdeas": "Ideas",
   "topicWork": "Work",
@@ -121,5 +101,28 @@
   "meetingTitle": "Give the next meeting three minutes",
   "meetingText": "Before our next discussion, let everyone write quietly for three minutes, then take turns sharing. It might give the quieter people a little more room to speak.",
   "morningTitle": "A small morning ritual",
-  "morningText": "While the kettle heats up, step onto the balcony for a moment. The first thing I do in the morning can simply be watching the sky grow light."
+  "morningText": "While the kettle heats up, step onto the balcony for a moment. The first thing I do in the morning can simply be watching the sky grow light.",
+  "@recordedDuration": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "retryLibrary": "Couldn’t open your cards. Try again",
+  "retry": "Try again",
+  "ready": "Ready",
+  "listening": "Listening…",
+  "manualTranscript": "When live transcription is unavailable, you can still record and enter a transcript after recording.",
+  "microphoneDenied": "Allow microphone access in Settings, then try again.",
+  "captureError": "Recording was interrupted. Check your microphone and available storage, then try again.",
+  "saveError": "Couldn’t save your changes. Please try again.",
+  "playError": "Couldn’t play this recording.",
+  "playAudio": "Play recording",
+  "pauseAudio": "Pause recording playback",
+  "recordedAudio": "Original recording",
+  "noTranscript": "No transcript for this recording.",
+  "recordedDuration": "Recording · {duration}",
+  "preparingSpeech": "Preparing on-device transcription. The first recording in this language may need a model download.",
+  "recordWithoutTranscript": "Record without transcript"
 }
