@@ -221,9 +221,11 @@ class _LibraryPageState extends State<LibraryPage> {
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 22),
                         child: Text(
-                          search.text.trim().isEmpty
+                          search.text.trim().isNotEmpty
+                              ? context.l10n.noMatches
+                              : savedOnly
                               ? context.l10n.noBookmarks
-                              : context.l10n.noMatches,
+                              : context.l10n.noCards,
                           style: prose,
                         ),
                       ),

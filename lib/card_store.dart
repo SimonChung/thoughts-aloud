@@ -7,6 +7,7 @@ import 'voice_media.dart';
 typedef LibraryContents = ({
   List<RecordedCard> cards,
   Map<String, bool> bookmarks,
+  Set<String> deletedSamples,
 });
 
 class CardStore {
@@ -21,9 +22,19 @@ class CardStore {
     final directory = await root;
     final cards = <RecordedCard>[];
     final bookmarks = <String, bool>{};
+    final deletedSamples = <String>{};
+    final deleted = Directory('${directory.path}/deleted');
+    final marks = Directory('${directory.path}/bookmarks');
+    if (await deleted.exists()) {
+      await for (final entry in deleted.list(followLinks: false)) {
+        final id = entry.uri.pathSegments.where((s) => s.isNotEmpty).last;
+        if (entry is File) deletedSamples.add(id);
+        await _cleanDeleted(entry, File('${marks.path}/$id'));
+      }
+    }
     await for (final entry in directory.list(followLinks: false)) {
       final id = entry.uri.pathSegments.where((s) => s.isNotEmpty).last;
-      if (entry is Directory && id != 'bookmarks') {
+      if (entry is Directory && id != 'bookmarks' && id != 'deleted') {
         final json = jsonDecode(
           await File('${entry.path}/card.json').readAsString(),
         );
@@ -38,7 +49,6 @@ class CardStore {
         );
       }
     }
-    final marks = Directory('${directory.path}/bookmarks');
     if (await marks.exists()) {
       await for (final entry in marks.list(followLinks: false)) {
         if (entry is File && !entry.path.endsWith('.tmp')) {
@@ -48,7 +58,28 @@ class CardStore {
       }
     }
     cards.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return (cards: cards, bookmarks: bookmarks);
+    return (cards: cards, bookmarks: bookmarks, deletedSamples: deletedSamples);
+  }
+
+  Future<void> delete(VoiceCard card) async {
+    final directory = await root;
+    final deleted = await Directory('${directory.path}/deleted').create();
+    final path = '${deleted.path}/${card.id}';
+    // Renaming commits the removal before any audio or metadata is unlinked.
+    // A marker file keeps a bundled sample hidden across launches.
+    final entry = card is RecordedCard
+        ? await Directory('${directory.path}/${card.id}').rename(path)
+        : await File(path).create();
+    await _cleanDeleted(entry, File('${directory.path}/bookmarks/${card.id}'));
+  }
+
+  Future<void> _cleanDeleted(FileSystemEntity entry, File bookmark) async {
+    try {
+      if (await bookmark.exists()) await bookmark.delete();
+      if (entry is Directory) await entry.delete(recursive: true);
+    } on FileSystemException {
+      // The card is already out of the library. Retry cleanup on next load.
+    }
   }
 
   Future<RecordedCard> save(

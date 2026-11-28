@@ -21,6 +21,7 @@ class _DetailPageState extends State<DetailPage> with WidgetsBindingObserver {
   int positionMs = 0;
   bool pending = false;
   bool polling = false;
+  bool deleting = false;
   int generation = 0;
   String? get audioPath => switch (widget.card) {
     RecordedCard(:final audioPath) => audioPath,
@@ -117,6 +118,50 @@ class _DetailPageState extends State<DetailPage> with WidgetsBindingObserver {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(context.l10n.playError)));
 
+  Future<void> confirmDelete() async {
+    setState(pause);
+    final card = widget.card;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        final strings = context.l10n;
+        return AlertDialog(
+          scrollable: true,
+          title: Text(strings.deleteCardTitle(card.text(strings).title)),
+          content: Text(
+            card is RecordedCard
+                ? strings.deleteRecordingMessage
+                : strings.deleteSampleMessage,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(strings.cancelDelete),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.error,
+              ),
+              child: Text(strings.deleteCard),
+            ),
+          ],
+        );
+      },
+    );
+    if (!mounted || confirmed != true) return;
+    setState(() => deleting = true);
+    try {
+      await widget.library.delete(card);
+      if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => deleting = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(context.l10n.deleteError)));
+    }
+  }
+
   void togglePreview() {
     setState(() {
       if (timer != null) {
@@ -148,7 +193,7 @@ class _DetailPageState extends State<DetailPage> with WidgetsBindingObserver {
     final strings = context.l10n;
     final text = card.text(strings);
     final local = MaterialLocalizations.of(context);
-    return ListenableBuilder(
+    final page = ListenableBuilder(
       listenable: library,
       builder: (context, _) {
         final saved = library.isSaved(card);
@@ -160,26 +205,38 @@ class _DetailPageState extends State<DetailPage> with WidgetsBindingObserver {
                 PageBar(
                   strings.voiceCard,
                   onBack: () => Navigator.pop(context),
-                  trailing: IconButton(
-                    tooltip: saved
-                        ? strings.removeBookmark
-                        : strings.addBookmark,
-                    isSelected: saved,
-                    icon: const Icon(Icons.bookmark_outline),
-                    selectedIcon: const Icon(Icons.bookmark),
-                    onPressed: library.saving(card)
-                        ? null
-                        : () async {
-                            try {
-                              await library.toggleBookmark(card);
-                            } catch (_) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(strings.saveError)),
-                                );
-                              }
-                            }
-                          },
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: saved
+                            ? strings.removeBookmark
+                            : strings.addBookmark,
+                        isSelected: saved,
+                        icon: const Icon(Icons.bookmark_outline),
+                        selectedIcon: const Icon(Icons.bookmark),
+                        onPressed: library.saving(card)
+                            ? null
+                            : () async {
+                                try {
+                                  await library.toggleBookmark(card);
+                                } catch (_) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(strings.saveError),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                      ),
+                      IconButton(
+                        tooltip: strings.deleteCard,
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: library.saving(card) ? null : confirmDelete,
+                      ),
+                    ],
                   ),
                 ),
                 Expanded(
@@ -333,6 +390,10 @@ class _DetailPageState extends State<DetailPage> with WidgetsBindingObserver {
           ),
         );
       },
+    );
+    return PopScope(
+      canPop: !deleting,
+      child: AbsorbPointer(absorbing: deleting, child: page),
     );
   }
 }

@@ -69,7 +69,7 @@ class _SampleCard extends VoiceCard {
 }
 
 class CardLibrary extends ChangeNotifier {
-  final _cards = <VoiceCard>[
+  static final _samples = <VoiceCard>[
     _SampleCard(
       'sample-walk',
       (s) => (title: s.walkTitle, transcript: s.walkText),
@@ -103,6 +103,7 @@ class CardLibrary extends ChangeNotifier {
       Cover.blush,
     ),
   ];
+  final _cards = <VoiceCard>[];
   final CardStore store;
   final _bookmarks = <String>{'sample-ideas'};
   final _saving = <String>{};
@@ -111,8 +112,12 @@ class CardLibrary extends ChangeNotifier {
 
   Future<void> load() async {
     final data = await store.load();
-    _cards.removeWhere((card) => card is RecordedCard);
-    _cards.insertAll(0, data.cards);
+    _cards
+      ..clear()
+      ..addAll(data.cards)
+      ..addAll(
+        _samples.where((card) => !data.deletedSamples.contains(card.id)),
+      );
     _bookmarks.clear();
     _bookmarks.add('sample-ideas');
     for (final entry in data.bookmarks.entries) {
@@ -122,6 +127,7 @@ class CardLibrary extends ChangeNotifier {
         _bookmarks.remove(entry.key);
       }
     }
+    _bookmarks.removeAll(data.deletedSamples);
   }
 
   int get count => _cards.length;
@@ -151,7 +157,7 @@ class CardLibrary extends ChangeNotifier {
       .take(2);
 
   Future<void> toggleBookmark(VoiceCard card) async {
-    if (!_saving.add(card.id)) return;
+    if (!_cards.contains(card) || !_saving.add(card.id)) return;
     final saved = !isSaved(card);
     notifyListeners();
     try {
@@ -161,6 +167,19 @@ class CardLibrary extends ChangeNotifier {
       } else {
         _bookmarks.remove(card.id);
       }
+    } finally {
+      _saving.remove(card.id);
+      notifyListeners();
+    }
+  }
+
+  Future<void> delete(VoiceCard card) async {
+    if (!_saving.add(card.id)) throw StateError('Card update in progress');
+    notifyListeners();
+    try {
+      await store.delete(card);
+      _cards.remove(card);
+      _bookmarks.remove(card.id);
     } finally {
       _saving.remove(card.id);
       notifyListeners();

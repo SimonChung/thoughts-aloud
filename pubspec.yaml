@@ -1,7 +1,7 @@
 name: thoughts_aloud
 description: "想唸 Thoughts Aloud，隨口記下想法的語音卡片 App。"
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.2.0+2
 
 environment:
   sdk: ^3.14.0

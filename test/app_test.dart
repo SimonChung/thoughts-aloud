@@ -11,9 +11,23 @@ import 'package:thoughts_aloud/voice_media.dart';
 class MemoryStore extends CardStore {
   final cards = <RecordedCard>[];
   final bookmarks = <String, bool>{};
+  final deletedSamples = <String>{};
+  bool failDelete = false;
 
   @override
-  Future<LibraryContents> load() async => (cards: cards, bookmarks: bookmarks);
+  Future<LibraryContents> load() async =>
+      (cards: cards, bookmarks: bookmarks, deletedSamples: deletedSamples);
+
+  @override
+  Future<void> delete(VoiceCard card) async {
+    if (failDelete) throw StateError('Storage unavailable');
+    if (card is RecordedCard) {
+      cards.remove(card);
+    } else {
+      deletedSamples.add(card.id);
+    }
+    bookmarks.remove(card.id);
+  }
 
   @override
   Future<void> bookmark(String id, bool saved) async => bookmarks[id] = saved;
@@ -40,6 +54,7 @@ Future<void> launch(
   List<String?>? recordingLocales,
   String recognized = '在窗邊聽見旋律。',
   List<String>? calls,
+  MemoryStore? store,
   Locale locale = const Locale.fromSubtags(
     languageCode: 'zh',
     scriptCode: 'Hant',
@@ -104,7 +119,7 @@ Future<void> launch(
       'transcribing': recognized.isNotEmpty && start != null,
     };
   });
-  await tester.pumpWidget(ThoughtsAloudApp(store: MemoryStore()));
+  await tester.pumpWidget(ThoughtsAloudApp(store: store ?? MemoryStore()));
   await tester.pumpAndSettle();
 }
 
@@ -116,6 +131,69 @@ Future<void> tap(WidgetTester tester, Finder target) async {
 }
 
 void main() {
+  testWidgets('刪除播放中的錄音卡可以取消、失敗可重試，成功後更新收藏與搜尋', (tester) async {
+    final store = MemoryStore();
+    final calls = <String>[];
+    const title = '測試錄音卡';
+    await store.save(
+      VoiceDraft('recorded', '/recorded/voice.wav'),
+      (title: title, transcript: '搜尋這段原音'),
+      DateTime(2026),
+      10,
+    );
+    await store.bookmark('recorded', true);
+    await launch(tester, store: store, calls: calls);
+    await tap(tester, find.widgetWithText(ChoiceChip, '收藏'));
+    await tap(tester, find.byTooltip('搜尋卡片'));
+    await tester.enterText(find.byType(TextField), '搜尋這段原音');
+    await tester.pumpAndSettle();
+    await tap(tester, find.text(title));
+    await tap(tester, find.byTooltip('播放錄音'));
+    await tap(tester, find.byTooltip('刪除卡片'));
+    expect(find.text('刪除「$title」？'), findsOneWidget);
+    expect(calls, containsAllInOrder(['play', 'stopPlayer']));
+    await tap(tester, find.text('取消'));
+    expect(find.byTooltip('取消收藏'), findsOneWidget);
+    store.failDelete = true;
+    await tap(tester, find.byTooltip('刪除卡片'));
+    await tap(tester, find.text('刪除卡片'));
+    expect(find.text('未能刪除卡片，請再試一次。'), findsOneWidget);
+    expect(store.cards, hasLength(1));
+    store.failDelete = false;
+    await tap(tester, find.byTooltip('刪除卡片'));
+    await tap(tester, find.text('刪除卡片'));
+    expect(find.text('4 張卡片'), findsOneWidget);
+    expect(find.textContaining('找不到符合的卡片'), findsOneWidget);
+    expect(store.cards, isEmpty);
+    expect(store.bookmarks, isEmpty);
+  });
+
+  testWidgets('從相關卡片刪除範例後回到卡片匣，重開後仍保留刪除結果', (tester) async {
+    final store = MemoryStore();
+    await launch(tester, store: store);
+    await tap(tester, find.text('把散步留在行事曆裡'));
+    await tap(tester, find.text('早晨的小小儀式'));
+    await tap(tester, find.text('把散步留在行事曆裡'));
+    await tap(tester, find.byTooltip('刪除卡片'));
+    await tap(tester, find.text('刪除卡片'));
+    expect(find.text('3 張卡片'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await launch(tester, store: store, locale: const Locale('en'));
+    expect(find.text('3 cards'), findsOneWidget);
+    expect(find.text('Put a walk on the calendar'), findsNothing);
+    for (final title in [
+      'Good ideas need a little space',
+      'Give the next meeting three minutes',
+      'A small morning ritual',
+    ]) {
+      await tap(tester, find.text(title));
+      await tap(tester, find.byTooltip('Delete card'));
+      await tap(tester, find.text('Delete card'));
+    }
+    expect(find.text('0 cards'), findsOneWidget);
+    expect(find.textContaining('Your card box is empty'), findsOneWidget);
+  });
+
   testWidgets('錄音能暫停、繼續、編輯並存回卡片匣', (tester) async {
     final calls = <String>[];
     await launch(tester, calls: calls);
